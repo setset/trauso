@@ -37,7 +37,7 @@
       "endpoints": [
         "https://github.com/basstimam/trauso/releases/latest/download/latest.json"
       ],
-      "pubkey": "YOUR_PUBLIC_KEY_HERE"
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEVFMkEzMzE2QjA1N0EyMUMKUldRY29sZXdGak1xN2tYcitBcThKQTIxS1pIL3l5azZtMlEzY3RMalFYZTM0SEx2OFVCV1QzaFAK"
     }
   }
 }
