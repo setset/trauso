@@ -487,5 +487,6 @@ function getStatusText(item: QueueItem) {
     case 'downloading': return `${item.progress.toFixed(1)}%`;
     case 'completed': return 'Done';
     case 'error': return 'Failed';
+    case 'cancelled': return 'Cancelled';
   }
 }

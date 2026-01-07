@@ -146,7 +146,6 @@ export function useDownloadQueue() {
           if (status.status === "complete") {
             updateItem(item.id, { status: "completed", progress: 100 });
           } else if (status.status === "error" || status.status === "removed") {
-             // Removed status handling
              updateItem(item.id, { 
                status: status.status === "error" ? "error" : "cancelled", 
                error: status.error_message || (status.status === "removed" ? "Cancelled" : "Aria2 error") 
