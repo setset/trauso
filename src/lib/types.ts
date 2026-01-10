@@ -45,3 +45,36 @@ export interface DownloadInfo {
 }
 
 export type DownloadStatus = DownloadInfo["status"];
+
+export interface AppSettings {
+  download_dir: string;
+  max_connections: number;
+  split_count: number;
+  min_split_size: string;
+  user_agent: string;
+  auto_start_aria2: boolean;
+  theme: string;
+  max_overall_download_limit_kb_per_sec: number;
+  max_download_limit_kb_per_sec: number;
+}
+
+export function formatBandwidth(kbPerSec: number): string {
+  if (kbPerSec === 0) {
+    return "Unlimited"
+  } else if (kbPerSec >= 1024) {
+    return `${(kbPerSec / 1024).toFixed(2)} MB/s`
+  } else {
+    return `${kbPerSec} KB/s`
+  }
+}
+
+export const BANDWIDTH_PRESETS: Array<{ label: string; value: number }> = [
+  { label: "Unlimited", value: 0 },
+  { label: "100 KB/s", value: 100 },
+  { label: "250 KB/s", value: 250 },
+  { label: "500 KB/s", value: 500 },
+  { label: "1 MB/s", value: 1024 },
+  { label: "2 MB/s", value: 2048 },
+  { label: "5 MB/s", value: 5120 },
+  { label: "10 MB/s", value: 10240 },
+]

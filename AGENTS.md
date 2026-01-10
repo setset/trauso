@@ -2,155 +2,64 @@
 
 ## Build Commands
 
-### Python (Legacy CLI/GUI)
+### Tauri (React/Rust)
 ```bash
-# Install dependencies
-pip install -r requirements.txt
+# Install dependencies (npm)
+npm install
 
-# Build standalone executable (menu-based)
-python build.py
+# Development mode (hot reload)
+npm run tauri dev
 
-# Run CLI version
-python terabox_cli.py
-
-# Run GUI version
-python terabox_gui.py
-```
-
-### Tauri (Modern React/Rust)
-```bash
-cd trauso/
-
-# Install dependencies (npm or bun)
-npm install  # or bun install
-
-# Development server
-npm run dev  # or bun run dev
-
-# Build for production
-npm run build  # or bun run build
+# Build for production (output: src-tauri/target/release/)
+npm run tauri build
 
 # Preview production build
 npm run preview
 
-# Build desktop app (Tauri)
-npm run tauri build
+# Run Vite dev server only (for frontend testing)
+npm run dev
+
+# Build Vite bundle only
+npm run build
 ```
 
 ### Rust Backend
 ```bash
-cd trauso/src-tauri/
+cd src-tauri/
 
 # Run tests
 cargo test
 
-# Check code
+# Check code (faster than build)
 cargo check
 
 # Build release
 cargo build --release
+
+# Update dependencies
+cargo update
 ```
 
 ## Testing
-**No formal test framework configured** in this project. When adding tests:
-- For Python: Consider adding `pytest`
-- For TypeScript: Consider adding `vitest` or `jest`
-- For Rust: Use `cargo test` (already available)
+
+**Current Status**: No formal test framework configured.
+
+### Recommendations:
+- **Frontend (TypeScript/React)**: Consider adding `vitest` or `@testing-library/react`
+- **Backend (Rust)**: Use `cargo test` (already available)
+- **E2E**: Consider `tauri-driver` with Playwright or Cypress
 
 ## Code Style Guidelines
 
-### Python Files (CLI/GUI)
-
-#### Import Organization
-- Follow PEP 8: Standard Library → Third-party → Local modules
-- Group imports with blank lines between groups
-- Type hints: Import from `typing` module
-
-```python
-import os
-import sys
-from pathlib import Path
-
-import requests
-from rich.console import Console
-
-from terabox1 import TeraboxFile, TeraboxLink
-```
-
-#### Naming Conventions
-- Classes: `PascalCase` (e.g., `TeraboxDownloader`, `TeraboxGUI`)
-- Functions/Methods: `snake_case` (e.g., `extract_shorturl`, `get_download_link`)
-- Variables: `snake_case` (e.g., `short_url`, `download_dir`)
-- Constants: `UPPER_CASE` (e.g., `BASE_URLS`, `WORKERS_ENDPOINTS`)
-- Private/Internal: Prefix with `_` (e.g., `_create_session`, `_file_cache`)
-
-#### Type Hinting
-- **Required** on all function arguments and return values
-- Use `Optional[T]` for nullable types
-- Use `Dict[str, Any]` for flexible dictionaries
-
-```python
-def get_info(shorturl: str, cookies: Optional[Dict[str, str]] = None) -> Optional[Dict[str, Any]]:
-    pass
-```
-
-#### Docstrings
-- Use triple double quotes `"""`
-- Google/NumPy style with `Args:` and `Returns:` sections
-- Mix of Indonesian and English is acceptable
-
-```python
-def extract_download_url(self) -> Optional[str]:
-    """
-    Extract direct download URL from TeraBox page.
-
-    Args:
-        None
-
-    Returns:
-        Direct download URL if found, None otherwise.
-    """
-```
-
-#### Error Handling
-- Use `try...except Exception as e` for risky operations (I/O, Network)
-- Log errors using `logger.error()`
-- Display to users via `rich.console` (CLI) or `messagebox` (GUI)
-
-```python
-try:
-    response = requests.get(url, timeout=15)
-    response.raise_for_status()
-except Exception as e:
-    self.logger.error(f"Download failed: {str(e)}")
-    console.print(f"[red]Error: {str(e)}[/]")
-```
-
-#### Logging
-- Use standard library `logging`
-- Instance: `logger = logging.getLogger(__name__)`
-- Logs saved to `/logs` folder with daily rotation (e.g., `terabox_20260107.log`)
-
-```python
-import logging
-logger = logging.getLogger(__name__)
-logger.info("Starting download...")
-logger.error(f"Error: {str(e)}")
-```
-
-#### Formatting
-- Indentation: 4 spaces (NOT tabs)
-- Two blank lines between top-level functions/classes
-- Line length: Standard PEP 8 (~79-99 chars), longer acceptable for UI/API parameters
-
-### TypeScript/React (Tauri Frontend)
+### TypeScript/React (Frontend)
 
 #### Import Style
 - Group imports: React → Third-party → Local components
 - Named imports preferred for better tree-shaking
+- Use `@/` alias for absolute imports from `src/` directory
 
 ```typescript
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { DownloadProgress } from './DownloadProgress'
 ```
@@ -159,75 +68,344 @@ import { DownloadProgress } from './DownloadProgress'
 - Use functional components with hooks
 - Props should be typed with interfaces
 - Use TypeScript strict mode
+- Use `export` explicitly for components meant to be used outside module
+
+```typescript
+interface DownloadProgressProps {
+  progress: number
+  status: 'downloading' | 'paused' | 'completed' | 'error'
+  onPause: () => void
+  onResume: () => void
+  onCancel: () => void
+}
+
+export function DownloadProgress({
+  progress,
+  status,
+  onPause,
+  onResume,
+  onCancel
+}: DownloadProgressProps) {
+  // Component implementation
+}
+```
+
+#### Hooks Pattern
+- Extract complex logic into custom hooks
+- Use `useCallback` for event handlers passed to children
+- Use `useMemo` for expensive computations
+- Use `useEffect` for side effects (API calls, subscriptions)
+
+```typescript
+// Custom hook example
+export function useDownloadQueue() {
+  const [queue, setQueue] = useState<DownloadItem[]>([])
+  const [status, setStatus] = useState<QueueStatus>('idle')
+
+  const addToQueue = useCallback((item: DownloadItem) => {
+    setQueue(prev => [...prev, item])
+  }, [])
+
+  return { queue, status, addToQueue }
+}
+```
+
+#### Error Handling
+- Use Error Boundaries for React component errors
+- Use try-catch for async operations
+- Display user-friendly error messages
+- Log errors to console and/or error tracking service
+
+```typescript
+try {
+  const result = await api.getTeraboxInfo(url)
+  setResult(result)
+} catch (error) {
+  console.error('Failed to fetch TeraBox info:', error)
+  setError('Gagal mengambil informasi file. Coba lagi.')
+}
+```
+
+#### State Management
+- Prefer local component state with `useState`
+- For complex state, consider `useReducer` or Zustand
+- Keep state as close to where it's used as possible
 
 #### CSS/Tailwind
 - Use Tailwind CSS utility classes
 - Follow component-based structure
 - Use `cn()` helper from `clsx` and `tailwind-merge` for conditional classes
 
+```typescript
+import { cn } from '@/lib/utils'
+
+export function Button({ variant = 'default', className, ...props }) {
+  return (
+    <button
+      className={cn(
+        'px-4 py-2 rounded font-medium',
+        variant === 'default' && 'bg-blue-600 text-white',
+        variant === 'ghost' && 'hover:bg-gray-100',
+        className
+      )}
+      {...props}
+    />
+  )
+}
+```
+
 ### Rust (Tauri Backend)
 
-#### Naming
+#### Naming Conventions
 - Functions/Variables: `snake_case`
 - Types/Structs: `PascalCase`
 - Constants: `UPPER_CASE`
+- Modules: `snake_case`
+
+```rust
+// Function
+pub fn get_terabox_info(url: &str) -> Result<TeraboxInfo, Error> {
+    // Implementation
+}
+
+// Struct
+pub struct TeraboxInfo {
+    pub filename: String,
+    pub size: u64,
+    pub url: String,
+}
+
+// Constant
+const MAX_RETRIES: u32 = 3;
+```
 
 #### Error Handling
 - Use `Result<T, E>` for fallible operations
 - Use `?` operator for early returns
-- Avoid `unwrap()` in production code
+- Avoid `unwrap()` in production code (use `expect()` with clear message if needed)
+- Create custom error types with `thiserror` crate
+
+```rust
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum TeraboxError {
+    #[error("Failed to fetch URL: {0}")]
+    FetchError(#[from] reqwest::Error),
+
+    #[error("Invalid response format")]
+    InvalidResponse,
+
+    #[error("File not found")]
+    NotFound,
+}
+
+pub async fn get_download_link(url: &str) -> Result<String, TeraboxError> {
+    let response = reqwest::get(url).await?;
+    // Process response
+    Ok(download_url)
+}
+```
+
+#### Async/Await
+- Use `tokio` for async runtime
+- Use `async fn` for async functions
+- Use `.await` properly (avoid blocking operations)
+
+```rust
+use tauri::command;
+
+#[command]
+pub async fn start_download(url: String) -> Result<String, String> {
+    // Async operation
+    let result = fetch_url(&url).await
+        .map_err(|e| e.to_string())?;
+    Ok(result)
+}
+```
+
+#### Tauri Commands
+- Use `#[command]` attribute for exposed functions
+- Return `Result<T, String>` for error handling (Tauri serializes as error)
+- Use appropriate types for parameters (String, numbers, structs with Serialize)
+
+```rust
+#[tauri::command]
+pub async fn add_download(
+    url: String,
+    dir: Option<String>,
+    filename: Option<String>,
+) -> Result<String, String> {
+    let download_dir = dir.unwrap_or_else(|| get_default_dir());
+    // Implementation
+    Ok(gid)
+}
+```
 
 ## Project Architecture
 
-This is a **hybrid project** with two implementations:
+### Technology Stack
+- **Frontend**: React 18 + TypeScript + Vite
+- **Backend**: Rust (Tauri v2)
+- **Styling**: Tailwind CSS v3
+- **UI Components**: Radix UI + Shadcn/ui
+- **Download Engine**: aria2 (multi-connection RPC client)
+- **Build Tool**: Vite (frontend) + Cargo (backend)
 
-### Legacy (Python)
-- `terabox_cli.py` - CLI interface using Rich for TUI
-- `terabox_gui.py` - GUI interface using Tkinter + Sun Valley theme
-- `workers.py` - API workers with strong type hints
-- `terabox1.py` - Low-level TeraBox API abstraction
-- `build.py` - Build script for standalone executable distribution
-
-### Modern (Tauri)
-- `trauso/src/main.tsx` - React frontend entry point
-- `trauso/src-tauri/src/lib.rs` - Rust backend with Tauri commands
-- `trauso/src-tauri/src/terabox/` - TeraBox API module (get_info, get_download_link)
-- `trauso/src-tauri/src/aria2/` - aria2 RPC client for download management
-- `trauso/src/lib/api.ts` - Frontend API wrapper for Tauri commands
-- `trauso/src/lib/types.ts` - TypeScript types for API
-- `trauso/src/components/file-list.tsx` - File browser with tree view
-- `trauso/src/components/download-progress.tsx` - Download progress with controls
-- Uses Vite for bundling, Tailwind CSS v3 for styling
-- Radix UI + Shadcn UI components for UI consistency
-
-#### Tauri Commands Available
-```typescript
-get_terabox_info(url: string)        // Get file info from TeraBox URL
-get_download_link(params)            // Get direct download link
-extract_shorturl(url: string)        // Extract shorturl from URL
-start_aria2()                        // Start aria2 daemon
-add_download(url, dir?, filename?)   // Add download to aria2
-get_download_status(gid: string)     // Get download progress
-pause_download(gid: string)          // Pause download
-resume_download(gid: string)         // Resume download
-cancel_download(gid: string)         // Cancel download
-get_all_downloads()                  // List all downloads
+### Directory Structure
+```
+trauso/
+├── src/                          # React frontend
+│   ├── main.tsx                 # React entry point
+│   ├── App.tsx                  # Main App component
+│   ├── components/              # Reusable UI components
+│   │   ├── file-list.tsx       # File browser with tree view
+│   │   ├── download-progress.tsx # Download progress with controls
+│   │   ├── settings-dialog.tsx  # Settings panel
+│   │   └── ui/                  # Shadcn UI components
+│   ├── lib/                     # Utilities and helpers
+│   │   ├── api.ts               # Tauri command wrapper
+│   │   ├── types.ts             # TypeScript type definitions
+│   │   └── utils.ts             # Helper functions
+│   ├── hooks/                   # Custom React hooks
+│   ├── assets/                  # Static assets (images, fonts)
+│   └── index.css                # Global styles + Tailwind directives
+├── src-tauri/                   # Rust backend
+│   ├── src/
+│   │   ├── lib.rs               # Main entry point
+│   │   ├── main.rs              # Tauri app entry
+│   │   ├── terabox/             # TeraBox API module
+│   │   │   ├── mod.rs
+│   │   │   └── api.rs          # get_info, get_download_link
+│   │   ├── aria2/               # aria2 RPC client
+│   │   │   ├── mod.rs
+│   │   │   └── client.rs       # add_download, get_status, pause, resume, cancel
+│   │   └── download/            # Download management module
+│   ├── Cargo.toml               # Rust dependencies
+│   ├── tauri.conf.json          # Tauri configuration
+│   └── target/                  # Build output (release binary)
+├── aria2/                       # aria2 binary (Windows)
+│   └── aria2c.exe
+├── aria2.conf                   # aria2 configuration
+├── public/                      # Static assets served by Vite
+├── package.json                 # Node.js dependencies
+├── tsconfig.json                # TypeScript configuration
+├── vite.config.ts               # Vite bundler configuration
+├── tailwind.config.js           # Tailwind CSS configuration
+└── postcss.config.js            # PostCSS configuration
 ```
 
-### Shared Dependencies
-- `aria2/` - Binary `aria2c.exe` for download management
-- `aria2.conf` - Aria2 configuration
+### Tauri Commands (Backend → Frontend)
+```typescript
+// TeraBox API
+get_terabox_info(url: string)              → Promise<TeraboxInfo>
+get_download_link(params: DownloadParams)  → Promise<DownloadLink>
+extract_shorturl(url: string)              → Promise<string>
+
+// aria2 Download Management
+start_aria2()                               → Promise<void>
+add_download(url: string, dir?: string, filename?: string)    → Promise<string>
+get_download_status(gid: string)            → Promise<DownloadStatus>
+pause_download(gid: string)                 → Promise<void>
+resume_download(gid: string)                → Promise<void>
+cancel_download(gid: string)                → Promise<void>
+get_all_downloads()                         → Promise<DownloadStatus[]>
+
+// Settings & Config
+set_download_dir(path: string)              → Promise<void>
+get_download_dir()                          → Promise<string>
+set_download_server(server: 1 | 2)          → Promise<void>
+get_download_server()                       → Promise<number>
+set_download_mode(mode: 'sequential' | 'parallel') → Promise<void>
+get_download_mode()                         → Promise<string>
+```
+
+### Data Flow
+```
+User Action (UI)
+    ↓
+Frontend (React Components)
+    ↓
+API Layer (src/lib/api.ts)
+    ↓
+Tauri Commands (invoke())
+    ↓
+Rust Backend (src-tauri/src/)
+    ↓
+External Services (TeraBox API, aria2 RPC)
+```
 
 ## Development Workflow
 
-1. **For Python changes**: Edit files in root directory, test with `python terabox_cli.py` or `python terabox_gui.py`
-2. **For Tauri changes**:
-   - Frontend: Work in `trauso/src/`, test with `npm run dev`
-   - Backend: Work in `trauso/src-tauri/src/`, test with `cargo test`
-3. **Before committing**: Ensure type hints are complete and logging is added for new features
+### 1. Setup (First Time)
+```bash
+# Install Node.js dependencies
+npm install
+
+# Install Rust (if not already installed)
+# Visit: https://www.rust-lang.org/tools/install
+
+# Verify Tauri CLI
+npm run tauri -- info
+```
+
+### 2. Development
+```bash
+# Start development server (hot reload for both frontend and backend)
+npm run tauri dev
+
+# Frontend changes only (faster reload)
+npm run dev
+
+# Backend changes only
+cd src-tauri && cargo watch -x run
+```
+
+### 3. Building
+```bash
+# Build for production
+npm run tauri build
+
+# Output location:
+# - Windows: src-tauri/target/release/trauso.exe
+# - macOS: src-tauri/target/release/Trauso.app
+# - Linux: src-tauri/target/release/trauso
+```
+
+### 4. Testing Before Commit
+- **Frontend**: Test UI changes in dev mode, check TypeScript errors
+- **Backend**: Run `cargo test` and `cargo clippy`
+- **Full Build**: Run `npm run tauri build` to verify release build works
+
+### 5. Common Tasks
+- **Add new Tauri command**: Define function in `src-tauri/src/lib.rs` with `#[command]`
+- **Add new UI component**: Create in `src/components/`, export and import in `App.tsx`
+- **Update types**: Modify `src/lib/types.ts` for type consistency across frontend
+- **Styling**: Use Tailwind utility classes, extend theme in `tailwind.config.js`
 
 ## Notes
-- No formal linting/formatting tools configured (no ESLint, Prettier, Black, etc.)
-- Aria2 binary must be present in `aria2/` folder for download functionality
-- Application logs stored in `logs/` folder with daily rotation
-- Settings stored in `config/settings.json` (Python) or app config (Tauri)
+
+### Dependencies
+- **Node.js** v18+ required for frontend development
+- **Rust** (latest stable) required for backend development
+- **C++ Build Tools** required on Windows for Tauri build
+- **aria2 binary** must be present in `aria2/` folder (bundled with release)
+
+### Configuration
+- **Tauri config**: `src-tauri/tauri.conf.json` (app name, version, permissions)
+- **Tailwind config**: `tailwind.config.js` (theme, plugins, content paths)
+- **TypeScript config**: `tsconfig.json` (compiler options, paths)
+- **aria2 config**: `aria2.conf` (download settings, connections)
+
+### Current Limitations
+- No formal testing framework configured (consider adding vitest/jest)
+- No linting/formatting configured (consider ESLint + Prettier)
+- Error tracking not integrated (consider Sentry)
+
+### Best Practices
+- Keep components small and focused (single responsibility)
+- Use TypeScript strict mode for type safety
+- Handle errors gracefully in both frontend and backend
+- Use Tauri's native dialogs for file operations
+- Optimize bundle size by avoiding unnecessary dependencies
+- Test aria2 RPC calls before implementing complex download logic

@@ -4,14 +4,14 @@ import { check } from '@tauri-apps/plugin-updater';
 import { relaunch, exit } from '@tauri-apps/plugin-process';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { confirm } from '@tauri-apps/plugin-dialog';
-import { Download, Loader2, Link, FileDown, Trash2, Play, Pause, FolderOpen, Settings, X, ListX } from "lucide-react";
+import { Download, Loader2, Link, FileDown, Trash2, Play, Pause, FolderOpen, Settings, X, ListX, Gauge } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { FileList, SelectAllButton } from "./file-list";
-import { getTeraboxInfo, formatBytes, stopAria2 } from "../lib/api";
+import { getTeraboxInfo, formatBytes, stopAria2, setBandwidthLimit, getBandwidthLimit } from "../lib/api";
 import { loadSettings, saveSettings } from "../lib/settings";
-import { TeraboxInfo } from "../lib/types";
+import { TeraboxInfo, formatBandwidth, BANDWIDTH_PRESETS } from "../lib/types";
 import { useDownloadQueue, QueueItem } from "../hooks/use-download-queue";
 import { cn } from "../lib/utils";
 
@@ -24,6 +24,8 @@ export function DashboardLayout() {
   const [downloadDir, setDownloadDir] = useState("");
   const [downloadMode, setDownloadMode] = useState(2);
   const [showSettings, setShowSettings] = useState(false);
+  const [maxOverallLimit, setMaxOverallLimit] = useState(0);
+  const [maxDownloadLimit, setMaxDownloadLimit] = useState(0);
 
   const {
     queue,
@@ -40,18 +42,24 @@ export function DashboardLayout() {
 
   // Load Settings
   useEffect(() => {
-    loadSettings().then(settings => {
+    loadSettings().then(async settings => {
       setDownloadDir(settings.downloadDir);
       setDownloadMode(settings.downloadMode);
       setMaxConcurrent(settings.maxConcurrent);
+      const [overallLimit, downloadLimit] = await getBandwidthLimit();
+      setMaxOverallLimit(overallLimit);
+      setMaxDownloadLimit(downloadLimit);
     });
   }, [setMaxConcurrent]);
 
-  const handleSaveSettings = () => {
+  const handleSaveSettings = async () => {
+    await setBandwidthLimit(maxOverallLimit, maxDownloadLimit);
     saveSettings({
       downloadDir,
       downloadMode,
-      maxConcurrent
+      maxConcurrent,
+      maxOverallDownloadLimitKbPerSec: maxOverallLimit,
+      maxDownloadLimitKbPerSec: maxDownloadLimit,
     });
     setShowSettings(false);
   };
@@ -382,11 +390,11 @@ export function DashboardLayout() {
                       "flex flex-col items-center justify-center gap-1 p-3 rounded-md border cursor-pointer hover:bg-accent transition-all text-center h-20",
                       maxConcurrent === 1 && "border-primary bg-primary/5"
                     )}>
-                        <input 
-                            type="radio" 
+                        <input
+                            type="radio"
                             className="hidden"
-                            checked={maxConcurrent === 1} 
-                            onChange={() => setMaxConcurrent(1)} 
+                            checked={maxConcurrent === 1}
+                            onChange={() => setMaxConcurrent(1)}
                         />
                         <span className="font-medium">Sequential</span>
                         <span className="text-xs text-muted-foreground">1 file at a time</span>
@@ -395,16 +403,58 @@ export function DashboardLayout() {
                       "flex flex-col items-center justify-center gap-1 p-3 rounded-md border cursor-pointer hover:bg-accent transition-all text-center h-20",
                       maxConcurrent > 1 && "border-primary bg-primary/5"
                     )}>
-                        <input 
-                            type="radio" 
+                        <input
+                            type="radio"
                             className="hidden"
-                            checked={maxConcurrent > 1} 
-                            onChange={() => setMaxConcurrent(5)} 
+                            checked={maxConcurrent > 1}
+                            onChange={() => setMaxConcurrent(5)}
                         />
                         <span className="font-medium">Parallel</span>
                         <span className="text-xs text-muted-foreground">Up to 5 files</span>
                     </label>
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <Gauge className="h-4 w-4" />
+                  Overall Speed Limit
+                </label>
+                <select
+                  className="w-full p-2 rounded-md border bg-background hover:bg-accent transition-all"
+                  value={maxOverallLimit}
+                  onChange={e => setMaxOverallLimit(Number(e.target.value))}
+                >
+                  {BANDWIDTH_PRESETS.map(preset => (
+                    <option key={preset.value} value={preset.value}>
+                      {preset.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-muted-foreground">
+                  Limit for all downloads combined. {formatBandwidth(maxOverallLimit)}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <Gauge className="h-4 w-4" />
+                  Per-Download Speed Limit
+                </label>
+                <select
+                  className="w-full p-2 rounded-md border bg-background hover:bg-accent transition-all"
+                  value={maxDownloadLimit}
+                  onChange={e => setMaxDownloadLimit(Number(e.target.value))}
+                >
+                  {BANDWIDTH_PRESETS.map(preset => (
+                    <option key={preset.value} value={preset.value}>
+                      {preset.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-muted-foreground">
+                  Limit for individual download. {formatBandwidth(maxDownloadLimit)}
+                </p>
               </div>
             </div>
             

@@ -6,12 +6,16 @@ export interface AppSettings {
   downloadDir: string;
   downloadMode: number;
   maxConcurrent: number;
+  maxOverallDownloadLimitKbPerSec: number;
+  maxDownloadLimitKbPerSec: number;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
   downloadDir: '',
   downloadMode: 2,
   maxConcurrent: 1,
+  maxOverallDownloadLimitKbPerSec: 0,
+  maxDownloadLimitKbPerSec: 0,
 };
 
 let storePromise: Promise<any> | null = null;

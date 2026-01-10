@@ -4,6 +4,7 @@ import type {
   DownloadParams,
   DownloadLink,
   DownloadInfo,
+  AppSettings,
 } from "./types";
 
 export async function getTeraboxInfo(url: string): Promise<TeraboxInfo> {
@@ -88,8 +89,30 @@ export function formatEta(totalSize: number, downloaded: number, speed: number):
   if (speed === 0) return "∞";
   const remaining = totalSize - downloaded;
   const seconds = Math.floor(remaining / speed);
-  
+
   if (seconds < 60) return `${seconds}s`;
   if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
   return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`;
+}
+
+export async function setBandwidthLimit(
+  maxOverallLimitKbPerSec: number,
+  maxDownloadLimitKbPerSec: number
+): Promise<void> {
+  return invoke<void>("set_bandwidth_limit", {
+    maxOverallLimitKbPerSec,
+    maxDownloadLimitKbPerSec,
+  });
+}
+
+export async function getBandwidthLimit(): Promise<[number, number]> {
+  return invoke<[number, number]>("get_bandwidth_limit");
+}
+
+export async function getAppSettings(): Promise<AppSettings> {
+  return invoke<AppSettings>("get_app_settings");
+}
+
+export async function saveAppSettings(settings: AppSettings): Promise<void> {
+  return invoke<void>("save_app_settings", { settings });
 }

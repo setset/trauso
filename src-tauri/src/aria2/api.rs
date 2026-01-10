@@ -6,22 +6,24 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 const DEFAULT_RPC_URL: &str = "http://localhost:6800/jsonrpc";
-const ARIA2_STARTUP_TIMEOUT: Duration = Duration::from_secs(5);
+const ARIA2_START_UP_TIMEOUT: Duration = Duration::from_secs(5);
 
 pub struct Aria2Client {
     client: Client,
     rpc_url: String,
     aria2_process: Mutex<Option<Child>>,
+    max_overall_download_limit_kb_per_sec: Mutex<u64>,
+    max_download_limit_kb_per_sec: Mutex<u64>,
 }
 
 impl Default for Aria2Client {
     fn default() -> Self {
-        Self::new(DEFAULT_RPC_URL)
+        Self::new(DEFAULT_RPC_URL, 0, 0)
     }
 }
 
 impl Aria2Client {
-    pub fn new(rpc_url: &str) -> Self {
+    pub fn new(rpc_url: &str, max_overall_limit_kb_per_sec: u64, max_download_limit_kb_per_sec: u64) -> Self {
         let client = Client::builder()
             .timeout(Duration::from_secs(30))
             .build()
@@ -31,7 +33,20 @@ impl Aria2Client {
             client,
             rpc_url: rpc_url.to_string(),
             aria2_process: Mutex::new(None),
+            max_overall_download_limit_kb_per_sec: Mutex::new(max_overall_limit_kb_per_sec),
+            max_download_limit_kb_per_sec: Mutex::new(max_download_limit_kb_per_sec),
         }
+    }
+
+    pub fn set_bandwidth_limit(&self, max_overall_limit_kb_per_sec: u64, max_download_limit_kb_per_sec: u64) {
+        *self.max_overall_download_limit_kb_per_sec.lock().unwrap() = max_overall_limit_kb_per_sec;
+        *self.max_download_limit_kb_per_sec.lock().unwrap() = max_download_limit_kb_per_sec;
+    }
+
+    pub fn get_bandwidth_limit(&self) -> (u64, u64) {
+        let overall = *self.max_overall_download_limit_kb_per_sec.lock().unwrap();
+        let per_download = *self.max_download_limit_kb_per_sec.lock().unwrap();
+        (overall, per_download)
     }
 
     fn get_aria2_path() -> Option<PathBuf> {
@@ -64,6 +79,12 @@ impl Aria2Client {
 
         let aria2_path = Self::get_aria2_path().ok_or("aria2c not found")?;
 
+        let overall_limit = *self.max_overall_download_limit_kb_per_sec.lock().unwrap();
+        let download_limit = *self.max_download_limit_kb_per_sec.lock().unwrap();
+
+        let overall_limit_arg = format!("{}K", overall_limit);
+        let download_limit_arg = format!("{}K", download_limit);
+
         let args = [
             "--enable-rpc",
             "--rpc-listen-all=false",
@@ -72,8 +93,8 @@ impl Aria2Client {
             "--max-connection-per-server=16",
             "--split=16",
             "--min-split-size=1M",
-            "--max-overall-download-limit=0",
-            "--max-download-limit=0",
+            &format!("--max-overall-download-limit={}", overall_limit_arg),
+            &format!("--max-download-limit={}", download_limit_arg),
             "--file-allocation=none",
             "--continue=true",
             "--auto-file-renaming=true",
@@ -97,7 +118,7 @@ impl Aria2Client {
         *self.aria2_process.lock().unwrap() = Some(child);
 
         let start = std::time::Instant::now();
-        while start.elapsed() < ARIA2_STARTUP_TIMEOUT {
+        while start.elapsed() < ARIA2_START_UP_TIMEOUT {
             if self.is_running().await {
                 return Ok(());
             }
@@ -261,6 +282,23 @@ impl Aria2Client {
 
     pub async fn shutdown(&self) -> Result<String, String> {
         self.call("shutdown", vec![]).await
+    }
+
+    pub async fn change_global_option(&self, key: &str, value: &str) -> Result<String, String> {
+        self.call(
+            "changeGlobalOption",
+            vec![
+                serde_json::json!({ key: value }),
+            ],
+        ).await
+    }
+
+    pub async fn get_global_option(&self, key: &str) -> Result<String, String> {
+        let result: serde_json::Value = self.call("getGlobalOption", vec![]).await?;
+        result.get(key)
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
+            .ok_or(format!("Option {} not found", key))
     }
 
     pub async fn get_all_downloads(&self) -> Result<Vec<DownloadInfo>, String> {

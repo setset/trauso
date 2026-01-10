@@ -6,30 +6,15 @@ use std::sync::Mutex;
 static SETTINGS: Mutex<Option<AppSettings>> = Mutex::new(None);
 static HISTORY: Mutex<Option<DownloadHistory>> = Mutex::new(None);
 
-fn get_config_dir() -> PathBuf {
-    let config_dir = dirs::config_dir()
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join("trauso");
-    fs::create_dir_all(&config_dir).ok();
-    config_dir
-}
-
-fn get_settings_path() -> PathBuf {
-    get_config_dir().join("settings.json")
-}
-
-fn get_history_path() -> PathBuf {
-    get_config_dir().join("history.json")
-}
-
 pub fn load_settings() -> AppSettings {
     let mut settings_guard = SETTINGS.lock().unwrap();
-    
+
     if let Some(ref settings) = *settings_guard {
         return settings.clone();
     }
 
-    let path = get_settings_path();
+    let config_dir = get_config_dir();
+    let path = config_dir.join("settings.json");
     let settings = if path.exists() {
         fs::read_to_string(&path)
             .ok()
@@ -44,10 +29,11 @@ pub fn load_settings() -> AppSettings {
 }
 
 pub fn save_settings(settings: &AppSettings) -> Result<(), String> {
-    let path = get_settings_path();
+    let config_dir = get_config_dir();
+    let path = config_dir.join("settings.json");
     let content = serde_json::to_string_pretty(settings)
         .map_err(|e| format!("Failed to serialize settings: {}", e))?;
-    
+
     fs::write(&path, content)
         .map_err(|e| format!("Failed to write settings: {}", e))?;
 
@@ -59,12 +45,13 @@ pub fn save_settings(settings: &AppSettings) -> Result<(), String> {
 
 pub fn load_history() -> DownloadHistory {
     let mut history_guard = HISTORY.lock().unwrap();
-    
+
     if let Some(ref history) = *history_guard {
         return history.clone();
     }
 
-    let path = get_history_path();
+    let config_dir = get_config_dir();
+    let path = config_dir.join("history.json");
     let history = if path.exists() {
         fs::read_to_string(&path)
             .ok()
@@ -79,10 +66,11 @@ pub fn load_history() -> DownloadHistory {
 }
 
 pub fn save_history(history: &DownloadHistory) -> Result<(), String> {
-    let path = get_history_path();
+    let config_dir = get_config_dir();
+    let path = config_dir.join("history.json");
     let content = serde_json::to_string_pretty(history)
         .map_err(|e| format!("Failed to serialize history: {}", e))?;
-    
+
     fs::write(&path, content)
         .map_err(|e| format!("Failed to write history: {}", e))?;
 
@@ -95,14 +83,21 @@ pub fn save_history(history: &DownloadHistory) -> Result<(), String> {
 pub fn add_history_item(item: DownloadHistoryItem) -> Result<(), String> {
     let mut history = load_history();
     history.items.insert(0, item);
-    
+
     if history.items.len() > 100 {
         history.items.truncate(100);
     }
-    
+
     save_history(&history)
 }
 
 pub fn clear_history() -> Result<(), String> {
     save_history(&DownloadHistory::default())
 }
+
+fn get_config_dir() -> PathBuf {
+    dirs::config_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join("trauso")
+}
+

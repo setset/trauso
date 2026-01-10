@@ -1,5 +1,5 @@
 mod api;
-mod types;
+pub mod types;
 
-pub use api::*;
 pub use types::*;
+pub use api::*;

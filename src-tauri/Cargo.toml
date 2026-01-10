@@ -60,4 +60,6 @@ async-trait = "0.1"
 # UUID for RPC request IDs
 uuid = { version = "1", features = ["v4"] }
 
+dirs = "5"
+
 
